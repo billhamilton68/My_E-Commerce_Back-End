@@ -1,13 +1,23 @@
 const router = require('express').Router();
 const { Product, Category, Tag, ProductTag } = require('../../models');
 
-// The `/api/products` endpoint
-
-// get all products
+// GET all products
 router.get('/', async (req, res) => {
   try {
     const productData = await Product.findAll({
-      include: [{ model: Category }, { model: Tag }],
+      include: [
+        {
+          model: Category,
+          as: 'category',
+          attributes: ['category_name'],
+        },
+        {
+          model: Tag,
+          as: 'tags',
+          through: ProductTag,
+          attributes: ['tag_name'],
+        },
+      ],
     });
     res.status(200).json(productData);
   } catch (err) {
@@ -15,11 +25,23 @@ router.get('/', async (req, res) => {
   }
 });
 
-// get one product
+// GET a single product
 router.get('/:id', async (req, res) => {
   try {
     const productData = await Product.findByPk(req.params.id, {
-      include: [{ model: Category }, { model: Tag }],
+      include: [
+        {
+          model: Category,
+          as: 'category',
+          attributes: ['category_name'],
+        },
+        {
+          model: Tag,
+          as: 'tags',
+          through: ProductTag,
+          attributes: ['tag_name'],
+        },
+      ],
     });
 
     if (!productData) {
@@ -33,10 +55,11 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// create new product
+// POST a new product
 router.post('/', async (req, res) => {
   try {
     const product = await Product.create(req.body);
+
     if (req.body.tagIds.length) {
       const productTagIdArr = req.body.tagIds.map((tag_id) => {
         return {
@@ -44,17 +67,18 @@ router.post('/', async (req, res) => {
           tag_id,
         };
       });
-      const productTagIds = await ProductTag.bulkCreate(productTagIdArr);
-      res.status(200).json(productTagIds);
+      const productTag = await ProductTag.bulkCreate(productTagIdArr);
+      res.status(200).json(productTag);
     } else {
       res.status(200).json(product);
     }
   } catch (err) {
+    console.log(err);
     res.status(400).json(err);
   }
 });
 
-// update product
+// UPDATE a product
 router.put('/:id', async (req, res) => {
   try {
     const product = await Product.update(req.body, {
@@ -64,6 +88,7 @@ router.put('/:id', async (req, res) => {
     });
 
     const productTags = await ProductTag.findAll({ where: { product_id: req.params.id } });
+
     const productTagIds = productTags.map(({ tag_id }) => tag_id);
     const newProductTags = req.body.tagIds
       .filter((tag_id) => !productTagIds.includes(tag_id))
@@ -83,12 +108,12 @@ router.put('/:id', async (req, res) => {
       ProductTag.bulkCreate(newProductTags),
     ]);
 
-    res.status(200).json(updatedProductTags);
+    res.json(updatedProductTags);
   } catch (err) {
+    console.error(err);
     res.status(400).json(err);
   }
 });
-
 // delete one product by its `id` value
 router.delete('/:id', async (req, res) => {
   try {
